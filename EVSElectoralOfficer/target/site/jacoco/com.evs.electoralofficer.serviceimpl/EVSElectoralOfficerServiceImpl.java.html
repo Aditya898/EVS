@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EVSElectoralOfficerServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">EVSElectoralOfficer</a> &gt; <a href="index.source.html" class="el_package">com.evs.electoralofficer.serviceimpl</a> &gt; <span class="el_source">EVSElectoralOfficerServiceImpl.java</span></div><h1>EVSElectoralOfficerServiceImpl.java</h1><pre class="source lang-java linenums">package com.evs.electoralofficer.serviceimpl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import com.evs.electoralofficer.dto.EVSVoterDto;
+import com.evs.electoralofficer.exception.NoVoterFoundException;
+import com.evs.electoralofficer.model.EVSVoter;
+import com.evs.electoralofficer.repository.EVSVoterRepository;
+import com.evs.electoralofficer.service.EVSElectoralOfficerApiClient;
+import com.evs.electoralofficer.service.EVSElectoralOfficerService;
+import com.twilio.Twilio;
+import com.twilio.rest.api.v2010.account.Message;
+import com.twilio.type.PhoneNumber;
+
+@Service
+<span class="fc" id="L24">public class EVSElectoralOfficerServiceImpl implements EVSElectoralOfficerService{</span>
+	@Value(&quot;${twilio.account_sid}&quot;)
+    private String accountSid;
+
+    @Value(&quot;${twilio.auth_token}&quot;)
+    private String authToken;
+
+    @Value(&quot;${twilio.trial_number}&quot;)
+    private String twilioPhoneNumber;
+	
+	@Autowired
+	private EVSElectoralOfficerApiClient electoralOfficerApiClient;
+	
+	@Autowired
+	private EVSVoterRepository evsVoterRepository;
+	
+//	@Autowired
+//	private EVSElectoralOfficerTwilioProperties electoralOfficerTwilioProperties;
+	
+	public void sendSms(String to, String message) {
+<span class="nc" id="L44">        Twilio.init(accountSid, authToken);</span>
+<span class="nc" id="L45">        Message.creator(new PhoneNumber(to), new PhoneNumber(twilioPhoneNumber), message).create();</span>
+<span class="nc" id="L46">    }</span>
+	
+	@Override
+	public ResponseEntity&lt;String&gt; approveOrRejectVoter(String voterId) {
+<span class="fc" id="L50">		Optional&lt;EVSVoter&gt; evsVoter = evsVoterRepository.findByVoterId(voterId);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">		if (evsVoter.isEmpty()) {</span>
+<span class="fc" id="L52">			throw new NoVoterFoundException(&quot;No voter found&quot;);</span>
+		}
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">		else if (evsVoter.get().getEvsVoterStatus().equals(&quot;APPROVED&quot;)) {</span>
+<span class="fc" id="L55">			return new ResponseEntity&lt;&gt;(String.format(&quot;Request is already Approved.&quot;),HttpStatus.OK);</span>
+
+		}
+<span class="nc bnc" id="L58" title="All 4 branches missed.">		else if((evsVoter.get().getAge()&gt;=18) &amp;&amp; (evsVoter.get().getEvsVoterStatus().equals(&quot;PENDING&quot;)))</span>
+		{
+<span class="nc" id="L60">			evsVoter.get().setEvsVoterStatus(&quot;APPROVED&quot;);</span>
+<span class="nc" id="L61">			evsVoterRepository.save(evsVoter.get());</span>
+//			String voterPhoneNumber = new PhoneNumber(evsVoter.get().getContactNo());
+//			System.out.println(voterPhoneNumber);
+			
+<span class="nc" id="L65">			String voterPhoneNumber = &quot;+91&quot;+evsVoter.get().getContactNo();</span>
+//			PhoneNumber adminContactNumber = new PhoneNumber(electoralOfficerTwilioProperties.getTrial_numberString());
+//			System.out.println(adminContactNumber);
+<span class="nc" id="L68">			String message = &quot;Dear Voter your Voter Request is successfully APPROVED, please check it&quot;;</span>
+//			Message message = Message.creator(voterPhoneNumber, adminContactNumber, mString).create();
+			
+<span class="nc" id="L71">			Twilio.init(accountSid, authToken);</span>
+<span class="nc" id="L72">	        Message.creator(new PhoneNumber(voterPhoneNumber), new PhoneNumber(twilioPhoneNumber), message).create();</span>
+<span class="nc" id="L73">			return new ResponseEntity&lt;&gt;(String.format(&quot;Successfully Approved voter request for the voter with id %s&quot;, voterId),HttpStatus.OK);</span>
+		}
+<span class="nc" id="L75">		evsVoter.get().setEvsVoterStatus(&quot;DECLINED&quot;);</span>
+<span class="nc" id="L76">		evsVoterRepository.save(evsVoter.get());</span>
+//		PhoneNumber voterPhoneNumber = new PhoneNumber(evsVoter.get().getContactNo());
+//		PhoneNumber adminContactNumber = new PhoneNumber(electoralOfficerTwilioProperties.getTrial_numberString());
+//		Message message = Message.creator(voterPhoneNumber, adminContactNumber, &quot;Dear Voter your Voter Request is DECLINED, please check it&quot;).create();
+<span class="nc" id="L80">		String voterPhoneNumber = &quot;+91&quot;+evsVoter.get().getContactNo();</span>
+//		PhoneNumber adminContactNumber = new PhoneNumber(electoralOfficerTwilioProperties.getTrial_numberString());
+//		System.out.println(adminContactNumber);
+<span class="nc" id="L83">		String message = &quot;Dear Voter your Voter Request is DECLINED, please check it&quot;;</span>
+//		Message message = Message.creator(voterPhoneNumber, adminContactNumber, mString).create();
+<span class="nc" id="L85">		Twilio.init(accountSid, authToken);</span>
+<span class="nc" id="L86">        Message.creator(new PhoneNumber(voterPhoneNumber), new PhoneNumber(twilioPhoneNumber), message).create();</span>
+<span class="nc" id="L87">		return new ResponseEntity&lt;&gt;(String.format(&quot;Successfully Declined the voter request for the voter with id %s&quot;, voterId),HttpStatus.OK);</span>
+		
+	}
+
+	@Override
+	public List&lt;EVSVoterDto&gt; getAllVoters() {
+<span class="fc" id="L93">		List&lt;EVSVoterDto&gt; listOfVotersDtos = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L94">		List&lt;EVSVoter&gt; listOfVoters = evsVoterRepository.findAllByEvsVoterStatus(&quot;PENDING&quot;);</span>
+<span class="fc" id="L95">		listOfVoters.forEach((voter)-&gt;{</span>
+<span class="fc" id="L96">			EVSVoterDto evsVoterDto = new EVSVoterDto(voter.getId(),</span>
+<span class="fc" id="L97">					voter.getVoterId(),</span>
+<span class="fc" id="L98">					voter.getUserName(),</span>
+<span class="fc" id="L99">					voter.getFirstName(),</span>
+<span class="fc" id="L100">					voter.getLastName(),</span>
+<span class="fc" id="L101">					voter.getGender(),</span>
+<span class="fc" id="L102">					voter.getEmail(),</span>
+<span class="fc" id="L103">					voter.getDateOfBirth(),</span>
+<span class="fc" id="L104">					voter.getAge(),</span>
+<span class="fc" id="L105">					voter.getContactNo(),</span>
+<span class="fc" id="L106">					voter.getAddress(),</span>
+<span class="fc" id="L107">					voter.getNationality(),</span>
+<span class="fc" id="L108">					voter.getEvsVoterStatus(),</span>
+<span class="fc" id="L109">					voter.getAadharCard());</span>
+<span class="fc" id="L110">			listOfVotersDtos.add(evsVoterDto);</span>
+<span class="fc" id="L111">		});</span>
+<span class="fc" id="L112">		return listOfVotersDtos;</span>
+	}
+
+	@Override
+	public ResponseEntity&lt;EVSVoterDto&gt; getVoter(String voterId) {
+<span class="fc" id="L117">		Optional&lt;EVSVoter&gt; evsOptional = evsVoterRepository.findByVoterId(voterId);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">		if (evsOptional.isEmpty()) {</span>
+<span class="fc" id="L119">			throw new NoVoterFoundException(&quot;No voter found with the voter id &quot;+ voterId);</span>
+		}
+<span class="fc" id="L121">		EVSVoterDto evsVoterDto = new EVSVoterDto(evsOptional.get().getId(),</span>
+<span class="fc" id="L122">				evsOptional.get().getVoterId(),</span>
+<span class="fc" id="L123">				evsOptional.get().getUserName(),</span>
+<span class="fc" id="L124">				evsOptional.get().getFirstName(),</span>
+<span class="fc" id="L125">				evsOptional.get().getLastName(),</span>
+<span class="fc" id="L126">				evsOptional.get().getGender(),</span>
+<span class="fc" id="L127">				evsOptional.get().getEmail(),</span>
+<span class="fc" id="L128">				evsOptional.get().getDateOfBirth(),</span>
+<span class="fc" id="L129">				evsOptional.get().getAge(),</span>
+<span class="fc" id="L130">				evsOptional.get().getContactNo(),</span>
+<span class="fc" id="L131">				evsOptional.get().getAddress(),</span>
+<span class="fc" id="L132">				evsOptional.get().getNationality(),</span>
+<span class="fc" id="L133">				evsOptional.get().getEvsVoterStatus(),</span>
+<span class="fc" id="L134">				evsOptional.get().getAadharCard());</span>
+		
+<span class="fc" id="L136">		return new ResponseEntity&lt;&gt;(evsVoterDto,HttpStatus.OK);</span>
+	}
+
+	public String checkStatus(String userName) {
+		
+<span class="fc" id="L141">		return electoralOfficerApiClient.checkStatus(userName);</span>
+	}
+
+	
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

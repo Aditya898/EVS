@@ -1,0 +1,37 @@
+Election -
+
+id
+electionCode
+electionName
+state
+constituency
+
+Party - 
+
+id
+partyCode
+partyname
+leader
+symbol
+
+Candidate - 
+
+id
+candidateId
+name
+address
+party
+age
+contact
+constituency
+
+Voter - 
+
+name
+email
+contactNo
+address
+gender
+age
+aadharNo
+aadharCard
